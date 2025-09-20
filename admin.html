@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
+h2 { text-align: center; margin-bottom: 25px; color: #333; }
+.card { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); margin-bottom: 35px; max-width: 1200px; margin-left: auto; margin-right: auto; overflow-x: auto; }
+.card h3 { margin-bottom: 20px; color: #007bff; }
+label { font-weight: bold; display: block; margin-bottom: 8px; }
+input { padding: 12px; width: 100%; margin-bottom: 15px; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; }
+button { background: #007bff; color: #fff; padding: 12px 18px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+button:hover { background: #0056b3; }
+table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 15px; }
+th, td { padding: 14px; border-bottom: 1px solid #ddd; text-align: left; }
+th { background: #007bff; color: white; }
+tr:hover { background: #f9f9f9; }
+.search-bar { margin-bottom: 15px; padding: 10px; width: 100%; border-radius: 8px; border: 1px solid #ccc; }
+select.status-select { padding: 6px 10px; border-radius: 6px; border: 1px solid #aaa; font-size: 14px; background: #f9f9f9; min-width: 120px; }
+.status-inprocess { background: #fff3cd; color: #856404; font-weight: bold; }
+.status-complete { background: #d4edda; color: #155724; font-weight: bold; }
+.status-onhold { background: #f8d7da; color: #721c24; font-weight: bold; }
+</style>
+</head>
+<body>
+<h2>Admin Panel</h2>
+
+<div class="card">
+<h3>Update Exchange Rate</h3>
+<label for="rateInput">1 MYR = ? MMK</label>
+<input type="number" id="rateInput" placeholder="Enter new rate" required>
+<button onclick="updateRate()">Update Rate</button>
+<p id="currentRate">Current Rate: <strong id="rateValue">520</strong> MMK</p>
+</div>
+
+<div class="card">
+<h3>Transaction Records</h3>
+<input type="text" id="searchInput" class="search-bar" placeholder="🔍 Search by receipt, sender, receiver, Bank Number, E-Wallet Number...">
+<table id="transactionTable">
+<thead>
+<tr>
+<th>Receipt Code</th>
+<th>Sender</th>
+<th>Receiver</th>
+<th>Bank Number</th>
+<th>E-Wallet Number</th>
+<th>Receiver ID</th>
+<th>Transfer Type</th>
+<th>City</th>
+<th>Amount (MYR)</th>
+<th>Total (MYR)</th>
+<th>MMK Received</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+
+<script>
+const rateValue = document.getElementById("rateValue");
+const savedRate = localStorage.getItem("exchangeRate") || 520;
+rateValue.textContent = savedRate;
+
+function updateRate() {
+  const newRate = document.getElementById("rateInput").value;
+  if(newRate && newRate > 0){
+    localStorage.setItem("exchangeRate", newRate);
+    rateValue.textContent = newRate;
+    alert("✅ Exchange rate updated!");
+  }
+}
+
+function applyStatusColor(selectEl){
+  selectEl.classList.remove("status-inprocess","status-complete","status-onhold");
+  if(selectEl.value==="In Process") selectEl.classList.add("status-inprocess");
+  else if(selectEl.value==="Complete") selectEl.classList.add("status-complete");
+  else if(selectEl.value==="On Hold") selectEl.classList.add("status-onhold");
+}
+
+function loadTransactions(){
+  const tbody = document.querySelector("#transactionTable tbody");
+  tbody.innerHTML = "";
+  let transactions = JSON.parse(localStorage.getItem("transactions") || "[]");
+
+  transactions.forEach((txn,index)=>{
+    if(!txn.status) txn.status="In Process";
+
+    // ✅ Force Bank Number to Bank column, E-Wallet number to E-Wallet column
+    let bankNumber = txn.receiverBankNumber || '-';
+    let ewalletNumber = txn.accountNumber || '-';
+
+    const row = document.createElement("tr");
+    row.innerHTML=`
+      <td>${txn.receiptCode}</td>
+      <td>${txn.senderName} (${txn.senderPhone})</td>
+      <td>${txn.receiverName || '-'} (${txn.receiverPhone || '-'})</td>
+      <td>${bankNumber}</td>
+      <td>${ewalletNumber}</td>
+      <td>${txn.receiverID || '-'}</td>
+      <td>${txn.walletType}</td>
+      <td>${txn.city || '-'}</td>
+      <td>RM ${txn.amount}</td>
+      <td>RM ${txn.total}</td>
+      <td>${txn.mmkAmount} MMK</td>
+      <td>
+        <select class="status-select" data-index="${index}">
+          <option value="In Process" ${txn.status==="In Process"?"selected":""}>In Process</option>
+          <option value="On Hold" ${txn.status==="On Hold"?"selected":""}>On Hold</option>
+          <option value="Complete" ${txn.status==="Complete"?"selected":""}>Complete</option>
+        </select>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+
+  document.querySelectorAll(".status-select").forEach(select=>{
+    applyStatusColor(select);
+    select.addEventListener("change",function(){
+      const index = this.getAttribute("data-index");
+      transactions[index].status = this.value;
+      localStorage.setItem("transactions",JSON.stringify(transactions));
+      applyStatusColor(this);
+    });
+  });
+}
+
+document.getElementById("searchInput").addEventListener("input",function(){
+  const filter = this.value.toLowerCase();
+  document.querySelectorAll("#transactionTable tbody tr").forEach(row=>{
+    row.style.display = row.innerText.toLowerCase().includes(filter)?"":"none";
+  });
+});
+
+window.onload = loadTransactions;
+</script>
+</body>
+</html>
